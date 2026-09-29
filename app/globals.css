@@ -5,12 +5,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
+html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: #fff9fa;
   color: #333333;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -18,13 +19,17 @@ body {
 .studio-container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
   background-color: #ffffff;
+  overflow: hidden;
 }
 
 /* Linke Spalte: Manuskript & Navigation */
 .sidebar-left {
   width: 280px;
+  height: 100%;
+  min-height: 0;
   background-color: #fff7f9;
   border-right: 1px solid #fce7f3;
   display: flex;
@@ -32,6 +37,7 @@ body {
   padding: 18px 14px;
   gap: 14px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .brand-header {
@@ -40,6 +46,7 @@ body {
   gap: 10px;
   padding-bottom: 12px;
   border-bottom: 1px dashed #fbb6ce;
+  flex-shrink: 0;
 }
 
 .brand-title {
@@ -56,6 +63,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .progress-text {
@@ -82,7 +90,11 @@ body {
 
 .scenes-tree {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -100,6 +112,7 @@ body {
   font-size: 0.9rem;
   color: #374151;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .scene-item.active {
@@ -112,6 +125,9 @@ body {
 /* Mittlere Spalte: Fokus-Editor & Plot-Board */
 .editor-center {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #ffffff;
@@ -126,6 +142,7 @@ body {
   padding: 14px 28px;
   border-bottom: 1px solid #fce7f3;
   background-color: #fffafd;
+  flex-shrink: 0;
 }
 
 .view-toggle {
@@ -162,11 +179,15 @@ body {
   background: transparent;
   padding: 18px 36px 8px 36px;
   width: 100%;
+  flex-shrink: 0;
 }
 
 .writing-area {
-  flex: 1;
-  padding: 12px 36px 40px 36px;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  padding: 12px 36px 140px 36px;
   border: none;
   outline: none;
   resize: none;
@@ -176,6 +197,9 @@ body {
   color: #27272a;
   background: transparent;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
 }
 
 .watermark {
@@ -196,11 +220,14 @@ body {
   color: #9ca3af;
   border-top: 1px solid #fce7f3;
   background-color: #ffffff;
+  flex-shrink: 0;
 }
 
 /* Rechte Spalte: Charakter-Zentrale & Inspector */
 .sidebar-right {
   width: 320px;
+  height: 100%;
+  min-height: 0;
   background-color: #fff7f9;
   border-left: 1px solid #fce7f3;
   display: flex;
@@ -209,6 +236,9 @@ body {
   gap: 16px;
   flex-shrink: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
 }
 
 .section-title {
@@ -218,6 +248,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .character-card {
@@ -228,6 +259,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .character-header {
@@ -253,6 +285,7 @@ body {
   padding: 10px;
   border-radius: 10px;
   border: 1px dashed #f472b6;
+  flex-shrink: 0;
 }
 
 .input-sm {
@@ -278,6 +311,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn-pink:active {
@@ -292,6 +326,10 @@ body {
   padding: 24px 36px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
 }
 
 .board-card {
