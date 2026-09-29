@@ -11,8 +11,8 @@ import {
   RefreshCw 
 } from 'lucide-react';
 
-const SUPABASE_URL = 'https://tptxwvggixjnvcqoxgmu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwdHh3dmdnaXhqbnZjcW94Z211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NTE1MjYsImV4cCI6MjEwNjAyNzUyNn0.f04IFwag5I4mwljFDP2qBAOHNW2uMuxMm4MzumzfL4g';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tptxwvggixjnvcqoxgmu.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwdHh3dmdnaXhqbnZjcW94Z211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0NTE1MjYsImV4cCI6MjEwNjAyNzUyNn0.f04IFwag5I4mwljFDP2qBAOHNW2uMuxMm4MzumzfL4g';
 
 function KittyMascot({ size = 32, className = '' }) {
   return (
@@ -34,47 +34,91 @@ function KittyMascot({ size = 32, className = '' }) {
   );
 }
 
+const DEFAULT_SCENE = {
+  id: 'scene-init',
+  title: 'Kapitel 1: Der Anfang 🌸',
+  act: 'Akt I',
+  content: 'Die Straßenlaternen flackerten sanft im Abendlicht. Kitty blickte aus dem Fenster und dachte an das bevorstehende Abenteuer...',
+  status: 'writing',
+  notes: '',
+  order_index: 1,
+};
+
+const DEFAULT_CHAR = {
+  id: 'char-init',
+  name: 'Kitty',
+  role: 'Hauptfigur',
+  description: 'Protagonistin mit rosa Schleife.',
+};
+
 export default function NovelStudio() {
   const [supabase, setSupabase] = useState(null);
-  const [scenes, setScenes] = useState([]);
-  const [activeScene, setActiveScene] = useState(null);
-  const [characters, setCharacters] = useState([]);
-  const [selectedChar, setSelectedChar] = useState(null);
+  const [scenes, setScenes] = useState([DEFAULT_SCENE]);
+  const [activeScene, setActiveScene] = useState(DEFAULT_SCENE);
+  const [characters, setCharacters] = useState([DEFAULT_CHAR]);
+  const [selectedChar, setSelectedChar] = useState(DEFAULT_CHAR);
   
   const [viewMode, setViewMode] = useState('write');
   const [newCharName, setNewCharName] = useState('');
-  const [renameTarget, setRenameTarget] = useState('');
+  const [renameTarget, setRenameTarget] = useState(DEFAULT_CHAR.name);
   const [renameNotice, setRenameNotice] = useState('');
 
+  // Initialisierung: Lokale Daten + Datenbankabgleich
   useEffect(() => {
-    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    setSupabase(client);
-
-    async function loadData() {
-      const { data: scenesData } = await client
-        .from('scenes')
-        .select('*')
-        .order('order_index', { ascending: true });
-
-      const { data: charsData } = await client
-        .from('characters')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (scenesData && scenesData.length > 0) {
-        setScenes(scenesData);
-        setActiveScene(scenesData[0]);
-      }
-      if (charsData) {
-        setCharacters(charsData);
-        if (charsData.length > 0) {
-          setSelectedChar(charsData[0]);
-          setRenameTarget(charsData[0].name);
-        }
-      }
+    let client = null;
+    try {
+      client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      setSupabase(client);
+    } catch (e) {
+      console.warn('Supabase Client konnte nicht initialisiert werden:', e);
     }
 
-    loadData();
+    // Aus lokalem Browser-Speicher laden (falls vorhanden)
+    const localScenes = localStorage.getItem('novel_studio_scenes');
+    const localChars = localStorage.getItem('novel_studio_chars');
+
+    if (localScenes) {
+      try {
+        const parsed = JSON.parse(localScenes);
+        if (parsed.length > 0) {
+          setScenes(parsed);
+          setActiveScene(parsed[0]);
+        }
+      } catch (e) {}
+    }
+
+    if (localChars) {
+      try {
+        const parsed = JSON.parse(localChars);
+        if (parsed.length > 0) {
+          setCharacters(parsed);
+          setSelectedChar(parsed[0]);
+          setRenameTarget(parsed[0].name);
+        }
+      } catch (e) {}
+    }
+
+    // Wenn Supabase erreichbar ist, Daten aus der Cloud laden
+    if (client) {
+      client.from('scenes').select('*').order('order_index', { ascending: true })
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setScenes(data);
+            setActiveScene(data[0]);
+            localStorage.setItem('novel_studio_scenes', JSON.stringify(data));
+          }
+        });
+
+      client.from('characters').select('*').order('created_at', { ascending: true })
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setCharacters(data);
+            setSelectedChar(data[0]);
+            setRenameTarget(data[0].name);
+            localStorage.setItem('novel_studio_chars', JSON.stringify(data));
+          }
+        });
+    }
   }, []);
 
   const totalWords = useMemo(() => {
@@ -89,21 +133,26 @@ export default function NovelStudio() {
     return (activeScene.content || '').trim().split(/\s+/).filter(Boolean).length;
   }, [activeScene]);
 
-  async function handleSceneUpdate(fields) {
-    if (!activeScene || !supabase) return;
+  // Szene sofort lokal aktualisieren und im Hintergrund speichern
+  function handleSceneUpdate(fields) {
+    if (!activeScene) return;
     const updated = { ...activeScene, ...fields };
     setActiveScene(updated);
-    setScenes(scenes.map((s) => (s.id === updated.id ? updated : s)));
+    
+    const updatedScenes = scenes.map((s) => (s.id === updated.id ? updated : s));
+    setScenes(updatedScenes);
+    localStorage.setItem('novel_studio_scenes', JSON.stringify(updatedScenes));
 
-    await supabase
-      .from('scenes')
-      .update(fields)
-      .eq('id', updated.id);
+    if (supabase && typeof updated.id === 'string' && !updated.id.startsWith('scene-')) {
+      supabase.from('scenes').update(fields).eq('id', updated.id).then();
+    }
   }
 
+  // Neue Szene sofort anzeigen
   async function createScene() {
-    if (!supabase) return;
-    const newSceneTemplate = {
+    const tempId = 'scene-' + Date.now();
+    const newScene = {
+      id: tempId,
       title: `Szene ${scenes.length + 1} 🌸`,
       act: 'Akt I',
       content: '',
@@ -112,52 +161,97 @@ export default function NovelStudio() {
       order_index: scenes.length + 1,
     };
 
-    const { data } = await supabase.from('scenes').insert([newSceneTemplate]).select();
-    if (data && data[0]) {
-      setScenes([...scenes, data[0]]);
-      setActiveScene(data[0]);
+    const updated = [...scenes, newScene];
+    setScenes(updated);
+    setActiveScene(newScene);
+    setViewMode('write');
+    localStorage.setItem('novel_studio_scenes', JSON.stringify(updated));
+
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('scenes').insert([{
+          title: newScene.title,
+          act: newScene.act,
+          content: newScene.content,
+          status: newScene.status,
+          notes: newScene.notes,
+          order_index: newScene.order_index,
+        }]).select();
+
+        if (data && data[0]) {
+          const synced = updated.map((s) => (s.id === tempId ? data[0] : s));
+          setScenes(synced);
+          setActiveScene(data[0]);
+          localStorage.setItem('novel_studio_scenes', JSON.stringify(synced));
+        }
+      } catch (e) {}
     }
   }
 
+  // Szene löschen
   async function deleteCurrentScene() {
-    if (!activeScene || !supabase) return;
-    await supabase.from('scenes').delete().eq('id', activeScene.id);
+    if (!activeScene) return;
     const remaining = scenes.filter((s) => s.id !== activeScene.id);
     setScenes(remaining);
     setActiveScene(remaining.length > 0 ? remaining[0] : null);
+    localStorage.setItem('novel_studio_scenes', JSON.stringify(remaining));
+
+    if (supabase && typeof activeScene.id === 'string' && !activeScene.id.startsWith('scene-')) {
+      supabase.from('scenes').delete().eq('id', activeScene.id).then();
+    }
   }
 
+  // Figur sofort hinzufügen
   async function addCharacter() {
-    if (!newCharName.trim() || !supabase) return;
+    if (!newCharName.trim()) return;
+    const name = newCharName.trim();
+    const tempId = 'char-' + Date.now();
     const newEntry = {
-      name: newCharName.trim(),
+      id: tempId,
+      name: name,
       role: 'Nebenfigur',
       description: '',
     };
 
-    const { data } = await supabase.from('characters').insert([newEntry]).select();
-    if (data && data[0]) {
-      setCharacters([...characters, data[0]]);
-      setSelectedChar(data[0]);
-      setRenameTarget(data[0].name);
-      setNewCharName('');
+    const updated = [...characters, newEntry];
+    setCharacters(updated);
+    setSelectedChar(newEntry);
+    setRenameTarget(name);
+    setNewCharName('');
+    localStorage.setItem('novel_studio_chars', JSON.stringify(updated));
+
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('characters').insert([{
+          name: newEntry.name,
+          role: newEntry.role,
+          description: newEntry.description,
+        }]).select();
+
+        if (data && data[0]) {
+          const synced = updated.map((c) => (c.id === tempId ? data[0] : c));
+          setCharacters(synced);
+          setSelectedChar(data[0]);
+          localStorage.setItem('novel_studio_chars', JSON.stringify(synced));
+        }
+      } catch (e) {}
     }
   }
 
+  // Globales Ersetzen
   async function performGlobalRename() {
-    if (!selectedChar || !renameTarget.trim() || !supabase) return;
+    if (!selectedChar || !renameTarget.trim()) return;
     const oldName = selectedChar.name;
     const newName = renameTarget.trim();
-
     if (oldName === newName) return;
 
     const regex = new RegExp(`\\b${oldName}\\b`, 'g');
 
-    const updatedScenes = scenes.map((scene) => {
-      const updatedContent = (scene.content || '').replace(regex, newName);
-      const updatedTitle = (scene.title || '').replace(regex, newName);
-      return { ...scene, content: updatedContent, title: updatedTitle };
-    });
+    const updatedScenes = scenes.map((s) => ({
+      ...s,
+      content: (s.content || '').replace(regex, newName),
+      title: (s.title || '').replace(regex, newName),
+    }));
 
     setScenes(updatedScenes);
     if (activeScene) {
@@ -167,27 +261,28 @@ export default function NovelStudio() {
         title: (activeScene.title || '').replace(regex, newName),
       });
     }
-
-    for (const scene of updatedScenes) {
-      await supabase
-        .from('scenes')
-        .update({ content: scene.content, title: scene.title })
-        .eq('id', scene.id);
-    }
-
-    await supabase
-      .from('characters')
-      .update({ name: newName })
-      .eq('id', selectedChar.id);
+    localStorage.setItem('novel_studio_scenes', JSON.stringify(updatedScenes));
 
     const updatedChars = characters.map((c) =>
       c.id === selectedChar.id ? { ...c, name: newName } : c
     );
     setCharacters(updatedChars);
     setSelectedChar({ ...selectedChar, name: newName });
+    localStorage.setItem('novel_studio_chars', JSON.stringify(updatedChars));
 
     setRenameNotice(`„${oldName}“ überall durch „${newName}“ ersetzt.`);
     setTimeout(() => setRenameNotice(''), 4000);
+
+    if (supabase) {
+      for (const s of updatedScenes) {
+        if (!s.id.startsWith('scene-')) {
+          supabase.from('scenes').update({ content: s.content, title: s.title }).eq('id', s.id).then();
+        }
+      }
+      if (!selectedChar.id.startsWith('char-')) {
+        supabase.from('characters').update({ name: newName }).eq('id', selectedChar.id).then();
+      }
+    }
   }
 
   const characterSnippets = useMemo(() => {
@@ -202,7 +297,7 @@ export default function NovelStudio() {
 
   return (
     <div className="studio-container">
-      {/* 1. Linke Leiste: Manuskript-Gliederung */}
+      {/* 1. Linke Spalte */}
       <aside className="sidebar-left">
         <div className="brand-header">
           <KittyMascot size={34} />
@@ -225,14 +320,15 @@ export default function NovelStudio() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
           <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#9d174d' }}>📖 MANUSKRIPT</span>
           <button 
+            type="button"
             onClick={createScene}
-            style={{ background: 'none', border: 'none', color: '#db2777', cursor: 'pointer', padding: '2px' }}
-            title="Szene anlegen"
+            className="btn-pink"
+            style={{ padding: '5px 10px', fontSize: '0.8rem', borderRadius: '8px' }}
           >
-            <Plus size={18} />
+            <Plus size={15} /> Szene
           </button>
         </div>
 
@@ -241,7 +337,7 @@ export default function NovelStudio() {
             <div
               key={scene.id}
               className={`scene-item ${activeScene?.id === scene.id ? 'active' : ''}`}
-              onClick={() => setActiveScene(scene)}
+              onClick={() => { setActiveScene(scene); setViewMode('write'); }}
             >
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {scene.title || `Szene ${idx + 1}`}
@@ -254,11 +350,12 @@ export default function NovelStudio() {
         </div>
       </aside>
 
-      {/* 2. Mittlere Leiste: Editor / Plot-Board */}
+      {/* 2. Mittlerer Schreibbereich */}
       <main className="editor-center">
         <div className="editor-toolbar">
           <div className="view-toggle">
             <button
+              type="button"
               className={`toggle-btn ${viewMode === 'write' ? 'active' : ''}`}
               onClick={() => setViewMode('write')}
             >
@@ -266,6 +363,7 @@ export default function NovelStudio() {
               Schreiben
             </button>
             <button
+              type="button"
               className={`toggle-btn ${viewMode === 'plot' ? 'active' : ''}`}
               onClick={() => setViewMode('plot')}
             >
@@ -276,8 +374,9 @@ export default function NovelStudio() {
 
           {activeScene && (
             <button 
+              type="button"
               onClick={deleteCurrentScene}
-              style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '6px' }}
               title="Szene löschen"
             >
               <Trash2 size={18} />
@@ -336,7 +435,7 @@ export default function NovelStudio() {
         )}
       </main>
 
-      {/* 3. Rechte Leiste: Charakter-Zentrale & Refactoring */}
+      {/* 3. Rechte Spalte: Charakter-Zentrale */}
       <aside className="sidebar-right">
         <div className="section-title">
           <Users size={18} />
@@ -350,9 +449,15 @@ export default function NovelStudio() {
             placeholder="Neuer Name..."
             value={newCharName}
             onChange={(e) => setNewCharName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') addCharacter(); }}
           />
-          <button className="btn-pink" onClick={addCharacter}>
-            <Plus size={16} />
+          <button 
+            type="button" 
+            className="btn-pink" 
+            onClick={addCharacter}
+            style={{ padding: '8px 14px', flexShrink: 0 }}
+          >
+            <Plus size={18} />
           </button>
         </div>
 
@@ -401,7 +506,7 @@ export default function NovelStudio() {
               onChange={(e) => setRenameTarget(e.target.value)}
               placeholder="Neuer Name..."
             />
-            <button className="btn-pink" onClick={performGlobalRename}>
+            <button type="button" className="btn-pink" onClick={performGlobalRename}>
               <RefreshCw size={14} /> Namen überall ersetzen
             </button>
             {renameNotice && (
