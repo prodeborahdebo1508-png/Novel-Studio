@@ -62,18 +62,42 @@ export default function NovelStudio() {
   const [newCharName, setNewCharName] = useState('');
   const [renameTarget, setRenameTarget] = useState(DEFAULT_CHAR.name);
   const [renameNotice, setRenameNotice] = useState('');
+  const [viewportHeight, setViewportHeight] = useState('100%');
 
-  // Initialisierung: Lokale Daten + Datenbankabgleich
+  // Bildschirmtastatur-Tracking: Passt die App millimetergenau an den sichtbaren Bereich an
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    function handleViewport() {
+      if (window.visualViewport) {
+        setViewportHeight(`${window.visualViewport.height}px`);
+      }
+      window.scrollTo(0, 0);
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewport);
+      window.visualViewport.addEventListener('scroll', handleViewport);
+    }
+    window.addEventListener('resize', handleViewport);
+    handleViewport();
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewport);
+        window.visualViewport.removeEventListener('scroll', handleViewport);
+      }
+      window.removeEventListener('resize', handleViewport);
+    };
+  }, []);
+
   useEffect(() => {
     let client = null;
     try {
       client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       setSupabase(client);
-    } catch (e) {
-      console.warn('Supabase Client konnte nicht initialisiert werden:', e);
-    }
+    } catch (e) {}
 
-    // Aus lokalem Browser-Speicher laden (falls vorhanden)
     const localScenes = localStorage.getItem('novel_studio_scenes');
     const localChars = localStorage.getItem('novel_studio_chars');
 
@@ -98,7 +122,6 @@ export default function NovelStudio() {
       } catch (e) {}
     }
 
-    // Wenn Supabase erreichbar ist, Daten aus der Cloud laden
     if (client) {
       client.from('scenes').select('*').order('order_index', { ascending: true })
         .then(({ data }) => {
@@ -133,7 +156,6 @@ export default function NovelStudio() {
     return (activeScene.content || '').trim().split(/\s+/).filter(Boolean).length;
   }, [activeScene]);
 
-  // Szene sofort lokal aktualisieren und im Hintergrund speichern
   function handleSceneUpdate(fields) {
     if (!activeScene) return;
     const updated = { ...activeScene, ...fields };
@@ -148,7 +170,6 @@ export default function NovelStudio() {
     }
   }
 
-  // Neue Szene sofort anzeigen
   async function createScene() {
     const tempId = 'scene-' + Date.now();
     const newScene = {
@@ -188,7 +209,6 @@ export default function NovelStudio() {
     }
   }
 
-  // Szene löschen
   async function deleteCurrentScene() {
     if (!activeScene) return;
     const remaining = scenes.filter((s) => s.id !== activeScene.id);
@@ -201,7 +221,6 @@ export default function NovelStudio() {
     }
   }
 
-  // Figur sofort hinzufügen
   async function addCharacter() {
     if (!newCharName.trim()) return;
     const name = newCharName.trim();
@@ -238,7 +257,6 @@ export default function NovelStudio() {
     }
   }
 
-  // Globales Ersetzen
   async function performGlobalRename() {
     if (!selectedChar || !renameTarget.trim()) return;
     const oldName = selectedChar.name;
@@ -296,7 +314,7 @@ export default function NovelStudio() {
   }, [selectedChar, activeScene]);
 
   return (
-    <div className="studio-container">
+    <div className="studio-container" style={{ height: viewportHeight }}>
       {/* 1. Linke Spalte */}
       <aside className="sidebar-left">
         <div className="brand-header">
